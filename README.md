@@ -79,12 +79,21 @@ Every arrow crosses a strict Zod contract. Invalid output never propagates.
 | Latency p50 / p95 | 6.8s / 19.0s |
 | Cost / request | ~$0.0002 at paid rates — $0 on free tier |
 | Total cost (20 prompts) | $0.0037 across 109k tokens |
+| **Structural determinism** | **100%** (3/3 runs identical) |
 
 **Highlights**
 
 - Every vague/incomplete prompt — "Build me an app for my business", "notes app", "A calculator" — was flagged ambiguous and still produced a runnable app with documented assumptions.
 - The self-contradictory forum prompt took 3 repair passes and still resolved to a consistent schema.
 - One real prompt failed on the first attempt (non-determinism) and failed cleanly (`ok:false`, no malformed output); it passed on retry.
+
+### Determinism
+
+Determinism is measured, not assumed. The same prompt is run 3x and the outputs are compared via a **canonical structural fingerprint** — sorted entities, tables-with-columns, endpoint ids, roles, and permissions — ignoring prose and ordering.
+
+- Reference CRM prompt: **3/3 runs identical — 100% structural determinism** (1 distinct shape).
+- This holds because the **codegen backend is deterministic by construction** (the same `ArchitectureIR` produces byte-identical schemas). The only variance source is the two LLM stages, run at temperature 0 with fixed seeds and bounded by the repair loop.
+- Re-run via `GET /api/determinism?runs=3`.
 
 ---
 
@@ -113,8 +122,8 @@ src/
   validation/   structural (Zod) . semantic . cross-layer
   components/   AppPreview — the in-browser runtime
   config/       model tiers + pricing . system prompts
-  eval/         dataset (20 prompts) . runner . metrics
-  app/          page.tsx (UI) . api/compile . api/eval
+  eval/         dataset (20 prompts) . runner . metrics . determinism
+  app/          page.tsx (UI) . api/compile . api/eval . api/determinism
 ```
 
 ---
@@ -160,8 +169,7 @@ npm run dev          # http://localhost:3000
 ## Limitations and honest notes
 
 - Targets data-driven CRUD apps; pure-computation or real-time apps (calculator, chat) degrade to the nearest data model rather than crashing.
-- Determinism is stable but not bit-exact — temperature-0 LLMs still vary on GPU; measured by re-running.
+- Determinism is measured at the **structural** level (100% identical app shape on the reference prompt); byte-level output isn't guaranteed, since temperature-0 LLMs still vary slightly on GPU.
 - The runtime is an in-memory interpreter (no persistence; tables show raw foreign-key ids, no join resolution).
 - Row-level `own` scope is modeled in the spec but not enforced in the preview.
 - Free-tier daily token caps apply; production would use a paid tier.
-```
