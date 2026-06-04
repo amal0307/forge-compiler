@@ -18,9 +18,16 @@ export async function POST(req: NextRequest) {
     try {
         return NextResponse.json(await compile(prompt));
     } catch (err) {
+        const raw = err instanceof Error ? err.message : "Compilation failed";
+        const rateLimited = /429|rate.?limit|quota|tokens per (day|minute)|resource exhausted/i.test(raw);
         return NextResponse.json(
-            { ok: false, error: err instanceof Error ? err.message : "Compilation failed" },
-            { status: 500 }
+            {
+                ok: false,
+                error: rateLimited
+                    ? "⏳ The free LLM tier is temporarily rate-limited — please wait a minute and try again."
+                    : `Compilation failed: ${raw}`,
+            },
+            { status: rateLimited ? 429 : 500 },
         );
     }
 }
